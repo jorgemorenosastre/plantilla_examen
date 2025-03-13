@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { validationSchema } from './config/validate';
+import { MoviesModule } from './peliculas/peliculas.module';
 import config from './config/config';
 
 
@@ -18,7 +19,9 @@ import config from './config/config';
       isGlobal: true,
       validationSchema
     }),
-   DatabaseModule
+   DatabaseModule,
+   MoviesModule
 ],
+
 })
 export class AppModule {}

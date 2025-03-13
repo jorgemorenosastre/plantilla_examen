@@ -1,9 +1,14 @@
-// App.tsx
 import React from 'react';
-import TabNavigator from './src/navigation/TabNavigation';
-import AppNavigator from './src/navigation/AppNavigator';
+import { StatusBar } from 'react-native';
+import HomeScreen from './src/screens/HomeScreen';
 
-export default function App() {
-  //return <TabNavigator />;
-  return <AppNavigator />
-}
+const App = () => {
+  return (
+    <>
+      <StatusBar barStyle="dark-content" />
+      <HomeScreen />
+    </>
+  );
+};
+
+export default App;
