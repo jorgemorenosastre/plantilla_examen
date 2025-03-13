@@ -1,0 +1,371 @@
+POSTGRE
+CREATE TABLE movies (
+  id SERIAL PRIMARY KEY,
+  nombre VARCHAR(255) NOT NULL,
+  descripcion TEXT,
+  año INTEGER,
+  imagen VARCHAR(255)
+);
+
+INSERT INTO movies (nombre, descripcion, año, imagen) VALUES 
+('Interstellar', 'Un grupo de exploradores viaja a través de un agujero de gusano en busca de un nuevo hogar para la humanidad.', 2014, 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg'),
+('Inception', 'Un ladrón que roba secretos corporativos a través del uso de la tecnología de compartir sueños.', 2010, 'https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg'),
+('The Dark Knight', 'Batman se enfrenta al Joker, un criminal que busca sumir a Ciudad Gótica en la anarquía.', 2008, 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg');
+
+
+
+
+BACKEND
+
+npm i -g @nestjs/cli
+nest new backend
+cd backend
+
+npm install @nestjs/typeorm typeorm pg
+
+config.ts
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+
+export const databaseConfig: TypeOrmModuleOptions = {
+  type: 'postgres',
+  host: process.env.DB_HOST || 'your-rds-endpoint.region.rds.amazonaws.com',
+  port: parseInt(process.env.DB_PORT) || 5432,
+  username: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || 'your-password',
+  database: process.env.DB_DATABASE || 'movies_db',
+  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+  synchronize: true, // Solo para desarrollo
+};
+
+
+app.module
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { databaseConfig } from './config/database.config';
+import { MoviesModule } from './movies/movies.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot(databaseConfig),
+    MoviesModule,
+  ],
+})
+export class AppModule {}
+
+movie.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('movies')
+export class Movie {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  nombre: string;
+
+  @Column()
+  descripcion: string;
+
+  @Column()
+  año: number;
+
+  @Column()
+  imagen: string;
+}
+
+nest g service movies
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Movie } from './entities/movie.entity';
+
+@Injectable()
+export class MoviesService {
+  constructor(
+    @InjectRepository(Movie)
+    private moviesRepository: Repository<Movie>,
+  ) {}
+
+  findAll(): Promise<Movie[]> {
+    return this.moviesRepository.find();
+  }
+
+  findOne(id: number): Promise<Movie> {
+    return this.moviesRepository.findOne({ where: { id } });
+  }
+
+  create(movie: Movie): Promise<Movie> {
+    return this.moviesRepository.save(movie);
+  }
+}
+
+nest g controller movies
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { MoviesService } from './movies.service';
+import { Movie } from './entities/movie.entity';
+
+@Controller('movies')
+export class MoviesController {
+  constructor(private readonly moviesService: MoviesService) {}
+
+  @Get()
+  findAll(): Promise<Movie[]> {
+    return this.moviesService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string): Promise<Movie> {
+    return this.moviesService.findOne(+id);
+  }
+
+  @Post()
+  create(@Body() movie: Movie): Promise<Movie> {
+    return this.moviesService.create(movie);
+  }
+}
+
+nest g module movies
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { MoviesController } from './movies.controller';
+import { MoviesService } from './movies.service';
+import { Movie } from './entities/movie.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Movie])],
+  controllers: [MoviesController],
+  providers: [MoviesService],
+})
+export class MoviesModule {}
+
+
+main.ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.enableCors(); // Habilitar CORS para el frontend
+  await app.listen(3000);
+}
+bootstrap();
+
+
+cd backend
+npm run start:dev
+
+
+REACT
+npx react-native init frontend --template react-native-template-typescript
+cd frontend
+
+npm install axios
+
+models/movie.ts
+export interface Movie {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  año: number;
+  imagen: string;
+}
+
+services/api.ts
+import axios from 'axios';
+import { Movie } from '../types/movie';
+
+const API_URL = 'http://10.0.2.2:3000'; // Usa tu IP local para desarrollo
+
+export const fetchMovies = async (): Promise<Movie[]> => {
+  try {
+    const response = await axios.get<Movie[]>(`${API_URL}/movies`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching movies:', error);
+    return [];
+  }
+};
+
+components/MovieCard.tsx
+import React from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
+import { Movie } from '../types/movie';
+
+interface MovieCardProps {
+  movie: Movie;
+}
+
+const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
+  return (
+    <View style={styles.card}>
+      <Image 
+        source={{ uri: movie.imagen }} 
+        style={styles.image} 
+        resizeMode="cover"
+      />
+      <View style={styles.info}>
+        <Text style={styles.title}>{movie.nombre}</Text>
+        <Text style={styles.year}>{movie.año}</Text>
+        <Text style={styles.description} numberOfLines={3}>
+          {movie.descripcion}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 15,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  image: {
+    width: '100%',
+    height: 200,
+  },
+  info: {
+    padding: 15,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  year: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+  },
+});
+
+export default MovieCard;
+
+
+screens/HomeScreen.tsx
+import React, { useEffect, useState } from 'react';
+import { 
+  SafeAreaView, 
+  FlatList, 
+  StyleSheet, 
+  Text, 
+  View, 
+  ActivityIndicator 
+} from 'react-native';
+import { Movie } from '../types/movie';
+import { fetchMovies } from '../services/api';
+import MovieCard from '../components/MovieCard';
+
+const HomeScreen: React.FC = () => {
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadMovies = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchMovies();
+        setMovies(data);
+        setError(null);
+      } catch (err) {
+        setError('Error al cargar las películas');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMovies();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.error}>{error}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.header}>Películas</Text>
+      <FlatList
+        data={movies}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => <MovieCard movie={item} />}
+        contentContainerStyle={styles.list}
+      />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  list: {
+    padding: 16,
+  },
+  error: {
+    color: 'red',
+    fontSize: 16,
+  },
+});
+
+export default HomeScreen;
+
+
+App.tsx
+import React from 'react';
+import { StatusBar } from 'react-native';
+import HomeScreen from './src/screens/HomeScreen';
+
+const App = () => {
+  return (
+    <>
+      <StatusBar barStyle="dark-content" />
+      <HomeScreen />
+    </>
+  );
+};
+
+export default App;
+
+
+cd frontend
+npx react-native run-android
+# o para iOS
+npx react-native run-ios
+
